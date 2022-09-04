@@ -88,7 +88,7 @@ public:
       // the home warehouse 90% of the time and as a remote warehouse 10% of the
       // time.
 
-      if (i == 0) {
+      // if (i == 0) {
         int x = random.uniform_dist(1, 100);
         if (x <= context.newOrderCrossPartitionProbability &&
             context.partition_num > 1) {
@@ -100,9 +100,9 @@ public:
         } else {
           query.INFO[i].OL_SUPPLY_W_ID = W_ID;
         }
-      } else {
-        query.INFO[i].OL_SUPPLY_W_ID = W_ID;
-      }
+      // } else {
+      //   query.INFO[i].OL_SUPPLY_W_ID = W_ID;
+      // }
       query.INFO[i].OL_QUANTITY = random.uniform_dist(1, 10);
     }
 
