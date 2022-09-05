@@ -1,15 +1,15 @@
-# servers="172.31.44.88:10010;172.31.34.24:10010;172.31.34.242:10010;172.31.41.134:10010;172.31.46.64:10010;172.31.38.97:10010;172.31.36.42:10010;172.31.42.221:10010;172.31.39.159:10010"
-servers="172.31.44.88:10010;172.31.34.24:10010;172.31.34.242:10010;172.31.41.134:10010;172.31.46.64:10010"
+servers="172.31.44.88:10010;172.31.34.24:10010;172.31.34.242:10010;172.31.41.134:10010;172.31.46.64:10010;172.31.38.97:10010;172.31.36.42:10010;172.31.42.221:10010;172.31.39.159:10010"
+# servers="172.31.44.88:10010;172.31.34.24:10010;172.31.34.242:10010;172.31.41.134:10010;172.31.46.64:10010"
 server_array=$(echo $servers | tr ";" "\n")
 worker_num=4
 io_num=1 # io_num=1 => 2 io threads
-server_num=5
-partition_num=40 # equals to warehouse table num
-# partition_num=72 # equals to warehouse table num
+# server_num=5
+# partition_num=40 # equals to warehouse table num
+partition_num=72 # equals to warehouse table num
 partitioner=hash # hash N => N replica
 batch_size=2000 # used for 
 read_on_replica=false
-protocol=ScarGC # Silo/Scar/TwoPL/SiloGC/ScarGC/Aria  SiloSI/ScarSI
+protocol=SiloGC # Silo/Scar/TwoPL/SiloGC/ScarGC/Aria  SiloSI/ScarSI
 query=mixed
 neworder_dist=100
 payment_dist=15
