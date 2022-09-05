@@ -43,7 +43,7 @@ payment_dist=15
 
 # # epoch
 ./bench_tpcc --logtostderr=1 \
-    --servers=$servers --id=$1 \
+    --servers=$servers --id=$1 --sleep_on_retry=true\
     --threads=$worker_num --io=$io_num --query=$query \
     --neworder_dist=$neworder_dist --payment_dist=$payment_dist \
     --batch_size=$batch_size --read_on_replica=$read_on_replica --partition_num=$partition_num --partitioner=$partitioner --protocol=$protocol

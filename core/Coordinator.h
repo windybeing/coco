@@ -94,6 +94,7 @@ public:
 
     do {
       std::this_thread::sleep_for(std::chrono::seconds(1));
+      // std::this_thread::sleep_for(std::chrono::microseconds(40000));
 
       uint64_t n_commit = 0, n_abort_no_retry = 0, n_abort_lock = 0,
                n_abort_read_validation = 0, n_local = 0,

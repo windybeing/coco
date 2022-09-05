@@ -96,6 +96,8 @@ public:
 
       bool retry_transaction = false;
 
+      uint32_t n_epoch_abort = 0;
+
       do {
 
         count++;
@@ -169,6 +171,8 @@ public:
 
         status = static_cast<ExecutorStatus>(worker_status.load());
       } while (status != ExecutorStatus::STOP);
+
+      
 
       flush_async_messages();
 

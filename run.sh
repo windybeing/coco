@@ -5,13 +5,13 @@ server_array=$(echo $servers | tr ";" "\n")
 echo $server_array
 
 for server in $server_array; do
+    ssh $server "tmux kill-session -t coco"
     rsync -aqzP --port=22 --force ./tpcc.sh $server:/home/ubuntu/coco/
     rsync -aqzP --port=22 --force ./bench_tpcc $server:/home/ubuntu/coco/
 done
 
 id=1
 for addr in $server_array; do
-    ssh $addr "tmux kill-session -t coco"
     ssh $addr "cd coco; tmux new-session -d -s coco \"./tpcc.sh $id\"" &
     ((id+=1));
 done
