@@ -1,6 +1,7 @@
 #include "benchmark/ycsb/Database.h"
 #include "core/Coordinator.h"
 #include "core/Macros.h"
+#include "common/Zipf2.h"
 
 DEFINE_int32(read_write_ratio, 80, "read write ratio");
 DEFINE_int32(read_only_ratio, 0, "read only transaction ratio");
@@ -44,8 +45,10 @@ int main(int argc, char *argv[]) {
     if (context.global_key_space) {
       coco::Zipf::globalZipf().init(
           context.keysPerPartition * context.partition_num, FLAGS_zipf);
+      Zipf2::zipfianGenerator = new Zipf2::ZipfianGenerator(0, context.keysPerPartition * context.partition_num - 1, FLAGS_zipf);
     } else {
       coco::Zipf::globalZipf().init(context.keysPerPartition, FLAGS_zipf);
+      Zipf2::zipfianGenerator = new Zipf2::ZipfianGenerator(0, context.keysPerPartition - 1, FLAGS_zipf);
     }
   }
 

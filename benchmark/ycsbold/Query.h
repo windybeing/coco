@@ -7,13 +7,12 @@
 #include "benchmark/ycsb/Context.h"
 #include "benchmark/ycsb/Random.h"
 #include "common/Zipf.h"
-#include "common/Zipf2.h"
 
 namespace coco {
 namespace ycsb {
 
 template <std::size_t N> struct YCSBQuery {
-  int64_t Y_KEY[N];
+  int32_t Y_KEY[N];
   bool UPDATE[N];
 };
 
@@ -168,7 +167,7 @@ private:
                                                       context.partition_num) -
                                          1);
         } else {
-          key = Zipf2::zipfianGenerator->nextValue();
+          key = Zipf::globalZipf().value(random.next_double());
         }
         query.Y_KEY[i] = key;
 
