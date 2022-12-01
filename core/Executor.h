@@ -161,13 +161,18 @@ public:
 
   void onExit() override {
 
-    LOG(INFO) << "Worker " << id << " latency: " << percentile.nth(50)
+    LOG(INFO) << "Worker " << id << " latency: " << percentile.aver()
+              << " us (aver) " << percentile.nth(50)
               << " us (50%) " << percentile.nth(75) << " us (75%) "
               << percentile.nth(95) << " us (95%) " << percentile.nth(99)
-              << " us (99%). dist txn latency: " << dist_latency.nth(50)
+              << " us (99%).";
+    LOG(INFO) << "dist txn latency: " << dist_latency.aver()
+              << " us (aver) " << dist_latency.nth(50)
               << " us (50%) " << dist_latency.nth(75) << " us (75%) "
               << dist_latency.nth(95) << " us (95%) " << dist_latency.nth(99)
-              << " us (99%). local txn latency: " << local_latency.nth(50)
+              << " us (99%).";
+    LOG(INFO) << "local txn latency: " << local_latency.aver()
+              << " us (aver) " << local_latency.nth(50)
               << " us (50%) " << local_latency.nth(75) << " us (75%) "
               << local_latency.nth(95) << " us (95%) " << local_latency.nth(99)
               << " us (99%).";

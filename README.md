@@ -18,3 +18,11 @@ git clone https://github.com/luyi0619/coco.git
 ```
 ./compile.sh
 ```
+# Run
+
+* YCSB
+Update server configuration in run_ycsb.sh and ycsb.sh
+Run contention test
+```
+./ycsb_zipf_test.sh
+```

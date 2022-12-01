@@ -35,6 +35,14 @@ public:
 
   auto size() { return data_.size(); }
 
+  element_type aver() {
+    if (data_.size() == 0) {
+      return 0;
+    }
+
+    return std::accumulate(data_.begin(), data_.end(), 0) / data_.size();
+  }
+
   element_type nth(double n) {
     if (data_.size() == 0) {
       return 0;
