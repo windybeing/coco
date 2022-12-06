@@ -96,9 +96,14 @@ public:
 
       bool retry_transaction = false;
 
-      uint32_t n_epoch_abort = 0;
+
+      // uint32_t n_epoch_abort = 0;
+      // uint32_t n_epoch_commit = 0;
+      // uint32_t n_epoch_local = 0;
+      // uint32_t n_epoch_distributed = 0;
 
       do {
+        int retry_cnt = 0;
 
         count++;
 
@@ -109,6 +114,7 @@ public:
           last_seed = random.get_seed();
 
           if (retry_transaction) {
+            retry_cnt++;
             transaction->reset();
           } else {
 
@@ -118,13 +124,18 @@ public:
                 workload.next_transaction(context, partition_id, storage);
             setupHandlers(*transaction);
           }
-
+          auto execution_start = std::chrono::steady_clock::now();
           auto result = transaction->execute(id);
+          auto execution_latency = std::chrono::duration_cast<std::chrono::microseconds>(
+                      std::chrono::steady_clock::now() - execution_start)
+                      .count();
           if (result == TransactionResult::READY_TO_COMMIT) {
             bool commit =
                 protocol.commit(*transaction, sync_messages, async_messages);
             n_network_size.fetch_add(transaction->network_size);
             if (commit) {
+              // n_epoch_commit += 1;
+
               n_commit.fetch_add(1);
               if (transaction->si_in_serializable) {
                 n_si_in_serializable.fetch_add(1);
@@ -133,25 +144,40 @@ public:
                 n_local.fetch_add(1);
               }
 
-              auto latency =
+              auto txn_lat =
                   std::chrono::duration_cast<std::chrono::microseconds>(
                       std::chrono::steady_clock::now() - transaction->startTime)
                       .count();
-              write_latency.add(latency);
+              write_latency.add(txn_lat);
               if (transaction->distributed_transaction) {
-                dist_latency.add(latency);
+                dist_latency.add(txn_lat);
+                // n_epoch_distributed += 1;
               } else {
-                local_latency.add(latency);
+                local_latency.add(txn_lat);
+                // n_epoch_local += 1;
               }
+              if (retry_cnt) {
+                auto abort_latency = std::chrono::duration_cast<std::chrono::microseconds>(
+                      execution_start - transaction->startTime)
+                      .count();
+                abort_lat.add(abort_latency);
+              } else {
+                abort_lat.add(0);
+              }
+              execution_lat.add(execution_latency);
+              prepare_lat.add(std::chrono::duration_cast<std::chrono::microseconds>(transaction->commitStartTime - transaction->prepareStartTime).count());
+              commit_lat.add(std::chrono::duration_cast<std::chrono::microseconds>(transaction->commitEndTime - transaction->commitStartTime).count());
               retry_transaction = false;
               q.push(std::move(transaction));
             } else {
+              // n_epoch_abort += 1;
               if (transaction->abort_lock) {
                 n_abort_lock.fetch_add(1);
               } else {
                 DCHECK(transaction->abort_read_validation);
                 n_abort_read_validation.fetch_add(1);
               }
+              // transaction->n_aborted += 1;
               if (context.sleep_on_retry) {
                 std::this_thread::sleep_for(std::chrono::microseconds(
                     random.uniform_dist(0, context.sleep_time)));
@@ -160,6 +186,7 @@ public:
               retry_transaction = true;
             }
           } else {
+            // n_epoch_abort += 1;
             protocol.abort(*transaction, sync_messages, async_messages);
             n_abort_no_retry.fetch_add(1);
           }
@@ -172,7 +199,11 @@ public:
         status = static_cast<ExecutorStatus>(worker_status.load());
       } while (status != ExecutorStatus::STOP);
 
-      
+      // static __thread int cc = 0;
+      // if (++cc % 40 == 0) {
+      //   LOG(INFO) << n_epoch_abort << " " << n_epoch_commit 
+      //     << " " << n_epoch_local << " " << n_epoch_distributed;
+      // }
 
       flush_async_messages();
 
@@ -193,19 +224,38 @@ public:
 
   void onExit() override {
 
-    LOG(INFO) << "Worker " << id << " latency: " << commit_latency.nth(50)
+    LOG(INFO) << "Worker " << id << " latency: " << commit_latency.aver() << " us (aver) " << commit_latency.nth(50)
               << " us (50%) " << commit_latency.nth(75) << " us (75%) "
               << commit_latency.nth(95) << " us (95%) "
               << commit_latency.nth(99)
-              << " us (99%). write latency: " << write_latency.nth(50)
+              << " us (99%).";
+    LOG(INFO) << "write latency: " << write_latency.aver() << " us (aver) " << write_latency.nth(50)
               << " us (50%) " << write_latency.nth(75) << " us (75%) "
               << write_latency.nth(95) << " us (95%) " << write_latency.nth(99)
-              << " us (99%). dist txn latency: " << dist_latency.nth(50)
+              << " us (99%).";
+    LOG(INFO) << "dist latency: " << dist_latency.aver() << " us (aver) " << dist_latency.nth(50)
               << " us (50%) " << dist_latency.nth(75) << " us (75%) "
               << dist_latency.nth(95) << " us (95%) " << dist_latency.nth(99)
-              << " us (99%). local txn latency: " << local_latency.nth(50)
+              << " us (99%).";
+    LOG(INFO) << "local latency: " << local_latency.aver() << " us (aver) " << local_latency.nth(50)
               << " us (50%) " << local_latency.nth(75) << " us (75%) "
               << local_latency.nth(95) << " us (95%) " << local_latency.nth(99)
+              << " us (99%).";
+    LOG(INFO) << "execution latency: " << execution_lat.aver() << " us (aver) " << execution_lat.nth(50)
+              << " us (50%) " << execution_lat.nth(75) << " us (75%) "
+              << execution_lat.nth(95) << " us (95%) " << execution_lat.nth(99)
+              << " us (99%).";
+    LOG(INFO) << "prepare latency: " << prepare_lat.aver() << " us (aver) " << prepare_lat.nth(50)
+              << " us (50%) " << prepare_lat.nth(75) << " us (75%) "
+              << prepare_lat.nth(95) << " us (95%) " << prepare_lat.nth(99)
+              << " us (99%).";
+    LOG(INFO) << "commit latency: " << commit_lat.aver() << " us (aver) " << commit_lat.nth(50)
+              << " us (50%) " << commit_lat.nth(75) << " us (75%) "
+              << commit_lat.nth(95) << " us (95%) " << commit_lat.nth(99)
+              << " us (99%).";
+    LOG(INFO) << "abort latency: " << abort_lat.aver() << " us (aver) " << abort_lat.nth(50)
+              << " us (50%) " << abort_lat.nth(75) << " us (75%) "
+              << abort_lat.nth(95) << " us (95%) " << abort_lat.nth(99)
               << " us (99%).";
 
     if (id == 0) {
@@ -331,6 +381,7 @@ protected:
   std::unique_ptr<Delay> delay;
   Percentile<int64_t> commit_latency, write_latency;
   Percentile<int64_t> dist_latency, local_latency;
+  Percentile<int64_t> execution_lat, prepare_lat, commit_lat, abort_lat;
   std::unique_ptr<TransactionType> transaction;
   std::vector<std::unique_ptr<Message>> sync_messages, async_messages;
   std::vector<

@@ -20,8 +20,16 @@ git clone https://github.com/luyi0619/coco.git
 ```
 # Run
 
+* TPCC
+Update server_num and partition_num configuration in run_ycsb.sh and ycsb.sh
+```
+./run_tpcc.sh
+```
 * YCSB
-Update server configuration in run_ycsb.sh and ycsb.sh
+Update server_num and partition_num configuration in run_ycsb.sh and ycsb.sh
+```
+./run_ycsb.sh
+```
 Run contention test
 ```
 ./ycsb_zipf_test.sh

@@ -164,6 +164,9 @@ public:
 public:
   std::size_t coordinator_id, partition_id;
   std::chrono::steady_clock::time_point startTime;
+  std::chrono::steady_clock::time_point prepareStartTime;
+  std::chrono::steady_clock::time_point commitStartTime;
+  std::chrono::steady_clock::time_point commitEndTime;
   std::size_t pendingResponses;
   std::size_t network_size;
   bool abort_lock, abort_read_validation, local_validated, si_in_serializable;

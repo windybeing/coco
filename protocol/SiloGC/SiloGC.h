@@ -73,7 +73,7 @@ public:
   bool commit(TransactionType &txn,
               std::vector<std::unique_ptr<Message>> &syncMessages,
               std::vector<std::unique_ptr<Message>> &asyncMessages) {
-
+    txn.prepareStartTime = std::chrono::steady_clock::now();
     // lock write set
     if (lock_write_set(txn, syncMessages)) {
       abort(txn, syncMessages, asyncMessages);
@@ -85,6 +85,7 @@ public:
       abort(txn, syncMessages, asyncMessages);
       return false;
     }
+    txn.commitStartTime = std::chrono::steady_clock::now(); 
 
     // generate tid
     uint64_t commit_tid = generate_tid(txn);
@@ -92,6 +93,7 @@ public:
     // write and replicate
     write_and_replicate(txn, commit_tid, syncMessages, asyncMessages);
 
+    txn.commitEndTime = std::chrono::steady_clock::now();
     return true;
   }
 
@@ -188,6 +190,7 @@ private:
           break;
         }
       } else {
+        assert(false);
         txn.pendingResponses++;
         auto coordinatorID = partitioner.master_coordinator(partitionId);
         txn.network_size += MessageFactoryType::new_read_validation_message(
