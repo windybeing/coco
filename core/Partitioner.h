@@ -39,7 +39,11 @@ public:
   }
 
   virtual bool is_backup() const = 0;
-
+  
+  std::size_t neighbor_coordinator() {
+    return (coordinator_id + 1) % coordinator_num;
+  }
+  
 protected:
   std::size_t coordinator_id;
   std::size_t coordinator_num;

@@ -70,7 +70,8 @@ public:
 
     std::queue<std::unique_ptr<TransactionType>> q;
     std::size_t count = 0;
-
+    auto time = std::chrono::steady_clock::now();
+    Percentile<int64_t> process_request_lat;
     for (;;) {
 
       ExecutorStatus status;
@@ -106,8 +107,9 @@ public:
         int retry_cnt = 0;
 
         count++;
-
+        process_request_lat.start();
         process_request();
+        process_request_lat.end();
 
         if (!partitioner->is_backup()) {
           // backup node stands by for replication
@@ -126,9 +128,8 @@ public:
           }
           auto execution_start = std::chrono::steady_clock::now();
           auto result = transaction->execute(id);
-          auto execution_latency = std::chrono::duration_cast<std::chrono::microseconds>(
-                      std::chrono::steady_clock::now() - execution_start)
-                      .count();
+          int64_t execution_latency = std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::steady_clock::now() - execution_start).count();
           if (result == TransactionResult::READY_TO_COMMIT) {
             bool commit =
                 protocol.commit(*transaction, sync_messages, async_messages);
@@ -156,14 +157,6 @@ public:
                 local_latency.add(txn_lat);
                 // n_epoch_local += 1;
               }
-              if (retry_cnt) {
-                auto abort_latency = std::chrono::duration_cast<std::chrono::microseconds>(
-                      execution_start - transaction->startTime)
-                      .count();
-                abort_lat.add(abort_latency);
-              } else {
-                abort_lat.add(0);
-              }
               execution_lat.add(execution_latency);
               prepare_lat.add(std::chrono::duration_cast<std::chrono::microseconds>(transaction->commitStartTime - transaction->prepareStartTime).count());
               commit_lat.add(std::chrono::duration_cast<std::chrono::microseconds>(transaction->commitEndTime - transaction->commitStartTime).count());
@@ -178,10 +171,14 @@ public:
                 n_abort_read_validation.fetch_add(1);
               }
               // transaction->n_aborted += 1;
+              sleep_on_retry_lat.start();
               if (context.sleep_on_retry) {
                 std::this_thread::sleep_for(std::chrono::microseconds(
                     random.uniform_dist(0, context.sleep_time)));
               }
+              sleep_on_retry_lat.end();
+              abort_execution_lat.add(execution_latency);
+              abort_prepare_lat.add(std::chrono::duration_cast<std::chrono::microseconds>(transaction->commitStartTime - transaction->prepareStartTime).count());
               random.set_seed(last_seed);
               retry_transaction = true;
             }
@@ -193,10 +190,45 @@ public:
 
           if (count % context.batch_flush == 0) {
             flush_async_messages();
-          }
+          } 
         }
-
         status = static_cast<ExecutorStatus>(worker_status.load());
+
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(
+                           std::chrono::steady_clock::now() - time)
+                           .count() > 3000 && id == 0) {
+        //   LOG(INFO) << "Worker " << id << " latency: " << commit_latency.aver() << " us (aver) " << commit_latency.sum()
+        //       << " us (sum).";
+        // LOG(INFO) << "write latency: " << write_latency.aver() << " us (aver) " << write_latency.sum()
+        //       << " us (sum).";
+        // LOG(INFO) << "dist latency: " << dist_latency.aver() << " us (aver) " << dist_latency.sum()
+        //       << " us (sum).";
+        // LOG(INFO) << "local latency: " << local_latency.aver() << " us (aver) " << local_latency.sum()
+        //       << " us (sum).";
+        LOG(INFO) << "execution latency: " << execution_lat.aver() << " us (aver) " << execution_lat.sum()
+              << " us (sum). " << execution_lat.size();
+        LOG(INFO) << "prepare latency: " << prepare_lat.aver() << " us (aver) " << prepare_lat.sum()
+              << " us (sum). " << prepare_lat.size();
+        LOG(INFO) << "abort_execution latency: " << abort_execution_lat.aver() << " us (aver) " << abort_execution_lat.sum()
+              << " us (sum). " << abort_execution_lat.size();
+        LOG(INFO) << "abort_prepare latency: " << abort_prepare_lat.aver() << " us (aver) " << abort_prepare_lat.sum()
+              << " us (sum). " << abort_prepare_lat.size();
+        LOG(INFO) << "commit latency: " << commit_lat.aver() << " us (aver) " << commit_lat.sum()
+              << " us (sum). " << commit_lat.size();
+        LOG(INFO) << "sleep_on_retry latency: " << sleep_on_retry_lat.aver() << " us (aver) " << sleep_on_retry_lat.sum()
+              << " us (sum). " << sleep_on_retry_lat.size();
+        LOG(INFO) << "process_request latency: " << process_request_lat.aver() << " us (aver) " << process_request_lat.sum()
+              << " us (sum). " << process_request_lat.size();
+
+          time = std::chrono::steady_clock::now();
+          execution_lat.clear();
+          prepare_lat.clear();
+          abort_execution_lat.clear();
+          abort_prepare_lat.clear();
+          commit_lat.clear();
+          sleep_on_retry_lat.clear();
+          process_request_lat.clear();
+        }
       } while (status != ExecutorStatus::STOP);
 
       // static __thread int cc = 0;
@@ -211,52 +243,36 @@ public:
 
       // once all workers are stop, we need to process the replication
       // requests
-
+      process_request_lat.start();
       while (static_cast<ExecutorStatus>(worker_status.load()) !=
              ExecutorStatus::CLEANUP) {
         process_request();
       }
 
       process_request();
+      process_request_lat.end();
       n_complete_workers.fetch_add(1);
     }
   }
 
   void onExit() override {
-
-    LOG(INFO) << "Worker " << id << " latency: " << commit_latency.aver() << " us (aver) " << commit_latency.nth(50)
-              << " us (50%) " << commit_latency.nth(75) << " us (75%) "
-              << commit_latency.nth(95) << " us (95%) "
-              << commit_latency.nth(99)
-              << " us (99%).";
-    LOG(INFO) << "write latency: " << write_latency.aver() << " us (aver) " << write_latency.nth(50)
-              << " us (50%) " << write_latency.nth(75) << " us (75%) "
-              << write_latency.nth(95) << " us (95%) " << write_latency.nth(99)
-              << " us (99%).";
-    LOG(INFO) << "dist latency: " << dist_latency.aver() << " us (aver) " << dist_latency.nth(50)
-              << " us (50%) " << dist_latency.nth(75) << " us (75%) "
-              << dist_latency.nth(95) << " us (95%) " << dist_latency.nth(99)
-              << " us (99%).";
-    LOG(INFO) << "local latency: " << local_latency.aver() << " us (aver) " << local_latency.nth(50)
-              << " us (50%) " << local_latency.nth(75) << " us (75%) "
-              << local_latency.nth(95) << " us (95%) " << local_latency.nth(99)
-              << " us (99%).";
-    LOG(INFO) << "execution latency: " << execution_lat.aver() << " us (aver) " << execution_lat.nth(50)
-              << " us (50%) " << execution_lat.nth(75) << " us (75%) "
-              << execution_lat.nth(95) << " us (95%) " << execution_lat.nth(99)
-              << " us (99%).";
-    LOG(INFO) << "prepare latency: " << prepare_lat.aver() << " us (aver) " << prepare_lat.nth(50)
-              << " us (50%) " << prepare_lat.nth(75) << " us (75%) "
-              << prepare_lat.nth(95) << " us (95%) " << prepare_lat.nth(99)
-              << " us (99%).";
-    LOG(INFO) << "commit latency: " << commit_lat.aver() << " us (aver) " << commit_lat.nth(50)
-              << " us (50%) " << commit_lat.nth(75) << " us (75%) "
-              << commit_lat.nth(95) << " us (95%) " << commit_lat.nth(99)
-              << " us (99%).";
-    LOG(INFO) << "abort latency: " << abort_lat.aver() << " us (aver) " << abort_lat.nth(50)
-              << " us (50%) " << abort_lat.nth(75) << " us (75%) "
-              << abort_lat.nth(95) << " us (95%) " << abort_lat.nth(99)
-              << " us (99%).";
+    
+    LOG(INFO) << "Worker " << id << " latency: " << commit_latency.aver() << " us (aver) " << commit_latency.sum()
+              << " us (sum).";
+    LOG(INFO) << "write latency: " << write_latency.aver() << " us (aver) " << write_latency.sum()
+              << " us (sum).";
+    LOG(INFO) << "dist latency: " << dist_latency.aver() << " us (aver) " << dist_latency.sum()
+              << " us (sum).";
+    LOG(INFO) << "local latency: " << local_latency.aver() << " us (aver) " << local_latency.sum()
+              << " us (sum).";
+    LOG(INFO) << "execution latency: " << execution_lat.aver() << " us (aver) " << execution_lat.sum()
+              << " us (sum).";
+    LOG(INFO) << "prepare latency: " << prepare_lat.aver() << " us (aver) " << prepare_lat.sum()
+              << " us (sum).";
+    LOG(INFO) << "commit latency: " << commit_lat.aver() << " us (aver) " << commit_lat.sum()
+              << " us (sum).";
+    LOG(INFO) << "abort latency: " << abort_lat.aver() << " us (aver) " << abort_lat.sum()
+              << " us (sum).";
 
     if (id == 0) {
       for (auto i = 0u; i < message_stats.size(); i++) {
@@ -379,9 +395,10 @@ protected:
   ProtocolType protocol;
   WorkloadType workload;
   std::unique_ptr<Delay> delay;
-  Percentile<int64_t> commit_latency, write_latency;
+  Percentile<int64_t> commit_latency, write_latency, while_latency;
   Percentile<int64_t> dist_latency, local_latency;
-  Percentile<int64_t> execution_lat, prepare_lat, commit_lat, abort_lat;
+  Percentile<int64_t> execution_lat, prepare_lat, commit_lat, abort_lat, sleep_on_retry_lat;
+  Percentile<int64_t> abort_execution_lat, abort_prepare_lat;
   std::unique_ptr<TransactionType> transaction;
   std::vector<std::unique_ptr<Message>> sync_messages, async_messages;
   std::vector<

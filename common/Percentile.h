@@ -19,8 +19,10 @@ public:
   using element_type = T;
 
   void add(const element_type &value) {
-    isSorted_ = false;
-    data_.push_back(value);
+    // isSorted_ = false;
+    // data_.push_back(value);
+    total += value;
+    ++cnt;
   }
 
   void add(const std::vector<element_type> &v) {
@@ -31,16 +33,24 @@ public:
   void clear() {
     isSorted_ = true;
     data_.clear();
+    total = cnt = 0;
   }
 
-  auto size() { return data_.size(); }
+  auto size() { return cnt; }
 
   element_type aver() {
-    if (data_.size() == 0) {
+    if (cnt == 0) {
       return 0;
     }
 
-    return std::accumulate(data_.begin(), data_.end(), 0) / data_.size();
+    return total / cnt;
+  }
+
+  element_type sum() {
+    if (cnt == 0) {
+      return 0;
+    }
+    return total;
   }
 
   element_type nth(double n) {
@@ -87,7 +97,6 @@ public:
     cdf.close();
   }
 
-private:
   void checkSort() {
     if (!isSorted_) {
       std::sort(data_.begin(), data_.end());
@@ -95,8 +104,21 @@ private:
     }
   }
 
-private:
+  void start() {
+    start_ts = std::chrono::steady_clock::now();
+  }
+
+  void end() {
+    total += std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now() - start_ts).count();
+    cnt += 1;
+  }
+
+public:
   bool isSorted_ = true;
   std::vector<element_type> data_;
+  element_type total = 0;
+  element_type cnt = 0;
+  std::chrono::steady_clock::time_point start_ts;
 };
 } // namespace coco

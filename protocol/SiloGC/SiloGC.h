@@ -77,12 +77,14 @@ public:
     // lock write set
     if (lock_write_set(txn, syncMessages)) {
       abort(txn, syncMessages, asyncMessages);
+      txn.commitStartTime = std::chrono::steady_clock::now(); 
       return false;
     }
 
     // commit phase 2, read validation
     if (!validate_read_set(txn, syncMessages)) {
       abort(txn, syncMessages, asyncMessages);
+      txn.commitStartTime = std::chrono::steady_clock::now(); 
       return false;
     }
     txn.commitStartTime = std::chrono::steady_clock::now(); 
@@ -141,7 +143,20 @@ private:
             *messages[coordinatorID], *table, writeKey.get_key(), i);
       }
     }
-
+#ifdef COCO_REMOTE
+    auto coordinatorID = partitioner.neighbor_coordinator();
+    auto message_cnt = (*messages[coordinatorID]).get_message_count();
+    if (message_cnt == 0) {
+      auto &writeKey = writeSet[0];
+      auto tableId = writeKey.get_table_id();
+      auto partitionId = writeKey.get_partition_id();
+      auto table = db.find_table(tableId, partitionId);
+      txn.network_size += MessageFactoryType::new_empty_message(
+            *messages[coordinatorID], *table);
+      txn.pendingResponses++;
+      // LOG(INFO) << "send empty msg";
+    }
+#endif
     sync_messages(txn);
 
     return txn.abort_lock;

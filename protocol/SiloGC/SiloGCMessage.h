@@ -18,6 +18,8 @@ namespace coco {
 enum class SiloGCMessage {
   SEARCH_REQUEST = static_cast<int>(ControlMessage::NFIELDS),
   SEARCH_RESPONSE,
+  EMPTY_REQUEST,
+  EMPTY_RESPONSE,
   LOCK_REQUEST,
   LOCK_RESPONSE,
   READ_VALIDATION_REQUEST,
@@ -50,6 +52,21 @@ public:
     encoder << message_piece_header;
     encoder.write_n_bytes(key, key_size);
     encoder << key_offset;
+    message.flush();
+    return message_size;
+  }
+
+  static std::size_t new_empty_message(Message &message, ITable &table) {
+    auto key_size = table.key_size();
+
+    auto message_size =
+        MessagePiece::get_header_size();
+    auto message_piece_header = MessagePiece::construct_message_piece_header(
+        static_cast<uint32_t>(SiloGCMessage::EMPTY_REQUEST), message_size,
+        table.tableID(), table.partitionID());
+
+    Encoder encoder(message.data);
+    encoder << message_piece_header;
     message.flush();
     return message_size;
   }
@@ -268,6 +285,40 @@ public:
     dec = Decoder(inputPiece.toStringPiece());
     dec.read_n_bytes(readKey.get_value(), value_size);
     readKey.set_tid(tid);
+    txn->pendingResponses--;
+    txn->network_size += inputPiece.get_message_length();
+  }
+
+  static void empty_request_handler(MessagePiece inputPiece,
+                                   Message &responseMessage, ITable &table,
+                                   Transaction *txn) {
+    // LOG(INFO) << "handle empty request";
+    DCHECK(inputPiece.get_message_type() ==
+           static_cast<uint32_t>(SiloGCMessage::EMPTY_REQUEST));
+    auto table_id = inputPiece.get_table_id();
+    auto partition_id = inputPiece.get_partition_id();
+    DCHECK(table_id == table.tableID());
+    DCHECK(partition_id == table.partitionID());
+    auto message_size = MessagePiece::get_header_size();
+    auto message_piece_header = MessagePiece::construct_message_piece_header(
+        static_cast<uint32_t>(SiloGCMessage::EMPTY_RESPONSE), message_size,
+        table_id, partition_id);
+
+    coco::Encoder encoder(responseMessage.data);
+    encoder << message_piece_header;
+    responseMessage.flush();
+  }
+
+  static void empty_response_handler(MessagePiece inputPiece,
+                                   Message &responseMessage, ITable &table,
+                                   Transaction *txn) {
+        // LOG(INFO) << "handle empty response";
+    DCHECK(inputPiece.get_message_type() ==
+           static_cast<uint32_t>(SiloGCMessage::EMPTY_RESPONSE));
+    auto table_id = inputPiece.get_table_id();
+    auto partition_id = inputPiece.get_partition_id();
+    DCHECK(table_id == table.tableID());
+    DCHECK(partition_id == table.partitionID());
     txn->pendingResponses--;
     txn->network_size += inputPiece.get_message_length();
   }
@@ -589,6 +640,8 @@ public:
     v.resize(static_cast<int>(ControlMessage::NFIELDS));
     v.push_back(SiloGCMessageHandler::search_request_handler);
     v.push_back(SiloGCMessageHandler::search_response_handler);
+    v.push_back(SiloGCMessageHandler::empty_request_handler);
+    v.push_back(SiloGCMessageHandler::empty_response_handler);
     v.push_back(SiloGCMessageHandler::lock_request_handler);
     v.push_back(SiloGCMessageHandler::lock_response_handler);
     v.push_back(SiloGCMessageHandler::read_validation_request_handler);
