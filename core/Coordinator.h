@@ -319,6 +319,7 @@ public:
         Decoder dec(messagePiece.toStringPiece());
         double v;
         dec >> v;
+        LOG(INFO) << "statistics " << v;
         sum += v;
       }
 

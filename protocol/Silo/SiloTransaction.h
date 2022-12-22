@@ -47,6 +47,23 @@ public:
 
   virtual void reset_query() = 0;
 
+  int64_t get_execution_lat() {
+    return execution_lat.sum();
+  }
+
+  int64_t get_process_request_lat() {
+    return process_request_lat.sum();
+  }
+
+  int64_t get_sync_message_lat() {
+    return sync_message_lat.sum();
+  }
+  void clear_lat() {
+    execution_lat.clear();
+    process_request_lat.clear();
+    sync_message_lat.clear();
+  }
+
   template <class KeyType, class ValueType>
   void search_local_index(std::size_t table_id, std::size_t partition_id,
                           const KeyType &key, ValueType &value) {
@@ -126,16 +143,18 @@ public:
       auto tid =
           readRequestHandler(readKey.get_table_id(), readKey.get_partition_id(),
                              i, readKey.get_key(), readKey.get_value(),
-                             readKey.get_local_index_read_bit());
+                             readKey.get_local_index_read_bit(), execution_lat, sync_message_lat);
       readSet[i].clear_read_request_bit();
       readSet[i].set_tid(tid);
     }
 
     if (pendingResponses > 0) {
       message_flusher();
+      process_request_lat.start();
       while (pendingResponses > 0) {
         remote_request_handler();
       }
+      process_request_lat.end();
     }
     return false;
   }
@@ -174,7 +193,7 @@ public:
   bool execution_phase;
   // table id, partition id, key, value, local index read?
   std::function<uint64_t(std::size_t, std::size_t, uint32_t, const void *,
-                         void *, bool)>
+                         void *, bool, Percentile<int64_t>&, Percentile<int64_t>&)>
       readRequestHandler;
   // processed a request?
   std::function<std::size_t(void)> remote_request_handler;
@@ -184,6 +203,7 @@ public:
   Partitioner &partitioner;
   Operation operation;
   std::vector<SiloRWKey> readSet, writeSet;
+  Percentile<int64_t> execution_lat, process_request_lat, sync_message_lat;
 };
 
 } // namespace coco

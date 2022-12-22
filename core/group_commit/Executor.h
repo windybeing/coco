@@ -72,6 +72,8 @@ public:
     std::size_t count = 0;
     auto time = std::chrono::steady_clock::now();
     Percentile<int64_t> process_request_lat;
+    Percentile<int64_t> sync_message_lat;
+    Percentile<int64_t> process_request2_lat, first_lat, second_lat, third_lat, total_execution_lat;
     for (;;) {
 
       ExecutorStatus status;
@@ -110,11 +112,12 @@ public:
         process_request_lat.start();
         process_request();
         process_request_lat.end();
-
+        std::chrono::steady_clock::time_point init_start;
+        int64_t init_latency = 0;
         if (!partitioner->is_backup()) {
           // backup node stands by for replication
           last_seed = random.get_seed();
-
+          init_start = std::chrono::steady_clock::now();
           if (retry_transaction) {
             retry_cnt++;
             transaction->reset();
@@ -126,9 +129,11 @@ public:
                 workload.next_transaction(context, partition_id, storage);
             setupHandlers(*transaction);
           }
+          init_latency = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now() - init_start).count();
           auto execution_start = std::chrono::steady_clock::now();
           auto result = transaction->execute(id);
-          int64_t execution_latency = std::chrono::duration_cast<std::chrono::microseconds>(
+          int64_t execution_latency = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now() - execution_start).count();
           if (result == TransactionResult::READY_TO_COMMIT) {
             bool commit =
@@ -157,9 +162,13 @@ public:
                 local_latency.add(txn_lat);
                 // n_epoch_local += 1;
               }
-              execution_lat.add(execution_latency);
-              prepare_lat.add(std::chrono::duration_cast<std::chrono::microseconds>(transaction->commitStartTime - transaction->prepareStartTime).count());
-              commit_lat.add(std::chrono::duration_cast<std::chrono::microseconds>(transaction->commitEndTime - transaction->commitStartTime).count());
+              execution_lat.add(execution_latency - transaction->get_process_request_lat() - transaction->get_sync_message_lat() + init_latency);
+              sync_message_lat.add(transaction->get_sync_message_lat());
+              if (transaction->get_process_request_lat() != 0) {
+                process_request2_lat.add(transaction->get_process_request_lat());
+              }
+              prepare_lat.add(std::chrono::duration_cast<std::chrono::nanoseconds>(transaction->commitStartTime - transaction->prepareStartTime).count());
+              commit_lat.add(std::chrono::duration_cast<std::chrono::nanoseconds>(transaction->commitEndTime - transaction->commitStartTime).count());
               retry_transaction = false;
               q.push(std::move(transaction));
             } else {
@@ -177,8 +186,12 @@ public:
                     random.uniform_dist(0, context.sleep_time)));
               }
               sleep_on_retry_lat.end();
-              abort_execution_lat.add(execution_latency);
-              abort_prepare_lat.add(std::chrono::duration_cast<std::chrono::microseconds>(transaction->commitStartTime - transaction->prepareStartTime).count());
+              abort_execution_lat.add(execution_latency - transaction->get_process_request_lat() - transaction->get_sync_message_lat() + init_latency);
+              sync_message_lat.add(transaction->get_sync_message_lat());
+              if (transaction->get_process_request_lat() != 0) {
+                process_request2_lat.add(transaction->get_process_request_lat());
+              }
+              abort_prepare_lat.add(std::chrono::duration_cast<std::chrono::nanoseconds>(transaction->commitStartTime - transaction->prepareStartTime).count());
               random.set_seed(last_seed);
               retry_transaction = true;
             }
@@ -219,6 +232,12 @@ public:
               << " us (sum). " << sleep_on_retry_lat.size();
         LOG(INFO) << "process_request latency: " << process_request_lat.aver() << " us (aver) " << process_request_lat.sum()
               << " us (sum). " << process_request_lat.size();
+        LOG(INFO) << "sync_message latency: " << sync_message_lat.aver() << " us (aver) " << sync_message_lat.sum()
+              << " us (sum). " << sync_message_lat.size();
+        LOG(INFO) << "process_request2 latency: " << process_request2_lat.aver() << " us (aver) " << process_request2_lat.sum()
+              << " us (sum). " << process_request2_lat.size();
+        LOG(INFO) << "total_execution latency: " << total_execution_lat.aver() << " us (aver) " << total_execution_lat.sum()
+              << " us (sum). " << total_execution_lat.size();
 
           time = std::chrono::steady_clock::now();
           execution_lat.clear();
@@ -228,6 +247,9 @@ public:
           commit_lat.clear();
           sleep_on_retry_lat.clear();
           process_request_lat.clear();
+          sync_message_lat.clear();
+          process_request2_lat.clear();
+          total_execution_lat.clear();
         }
       } while (status != ExecutorStatus::STOP);
 

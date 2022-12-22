@@ -109,7 +109,7 @@ public:
   }
 
   void end() {
-    total += std::chrono::duration_cast<std::chrono::microseconds>(
+    total += std::chrono::duration_cast<std::chrono::nanoseconds>(
       std::chrono::steady_clock::now() - start_ts).count();
     cnt += 1;
   }

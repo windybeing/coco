@@ -37,7 +37,8 @@ public:
   virtual ~NewOrder() override = default;
 
   TransactionResult execute(std::size_t worker_id) override {
-
+    this->clear_lat();
+    this->execution_lat.start();
     int32_t W_ID = this->partition_id + 1;
 
     // The input data (see Clause 2.4.3.2) are communicated to the SUT.
@@ -109,11 +110,11 @@ public:
       this->search_for_update(stockTableID, OL_SUPPLY_W_ID - 1,
                               storage.stock_keys[i], storage.stock_values[i]);
     }
-
+    this->execution_lat.end();
     if (this->process_requests(worker_id)) {
       return TransactionResult::ABORT;
     }
-
+    this->execution_lat.start();
     float W_TAX = storage.warehouse_value.W_YTD;
 
     float D_TAX = storage.district_value.D_TAX;
@@ -253,7 +254,7 @@ public:
         total_amount += OL_AMOUNT * (1 - C_DISCOUNT) * (1 + W_TAX + D_TAX);
       }
     }
-
+    this->execution_lat.end();
     return TransactionResult::READY_TO_COMMIT;
   }
 
@@ -288,7 +289,8 @@ public:
   virtual ~Payment() override = default;
 
   TransactionResult execute(std::size_t worker_id) override {
-
+    this->clear_lat();
+    this->execution_lat.start();
     int32_t W_ID = this->partition_id + 1;
 
     // The input data (see Clause 2.5.3.2) are communicated to the SUT.
@@ -331,8 +333,9 @@ public:
       this->search_for_read(customerNameIdxTableID, C_W_ID - 1,
                             storage.customer_name_idx_key,
                             storage.customer_name_idx_value);
-
+      this->execution_lat.end();
       this->process_requests(worker_id);
+      this->execution_lat.start();
       C_ID = storage.customer_name_idx_value.C_ID;
       CHECK(C_ID > 0) << "Invalid C_ID read from index";
     }
@@ -341,10 +344,11 @@ public:
     storage.customer_key = customer::key(C_W_ID, C_D_ID, C_ID);
     this->search_for_update(customerTableID, C_W_ID - 1, storage.customer_key,
                             storage.customer_value);
+    this->execution_lat.end();
     if (this->process_requests(worker_id)) {
       return TransactionResult::ABORT;
     }
-
+    this->execution_lat.start();
     if (context.write_to_w_ytd) {
       // the warehouse's year-to-date balance, is increased by H_ AMOUNT.
       storage.warehouse_value.W_YTD += H_AMOUNT;
@@ -433,6 +437,7 @@ public:
       storage.h_value.H_AMOUNT = H_AMOUNT;
       storage.h_value.H_DATA.assign(H_DATA, written);
     }
+    this->execution_lat.end();
     return TransactionResult::READY_TO_COMMIT;
   }
 

@@ -47,7 +47,7 @@ public:
     txn.readRequestHandler =
         [this, &txn](std::size_t table_id, std::size_t partition_id,
                      uint32_t key_offset, const void *key, void *value,
-                     bool local_index_read) -> uint64_t {
+                     bool local_index_read, Percentile<int64_t>& execution_lat, Percentile<int64_t>& sync_message_lat) -> uint64_t {
       bool local_read = false;
 
       if (this->partitioner->has_master_partition(partition_id) ||
@@ -58,8 +58,12 @@ public:
       }
 
       if (local_index_read || local_read) {
-        return this->protocol.search(table_id, partition_id, key, value);
+        execution_lat.start();
+        auto ret = this->protocol.search(table_id, partition_id, key, value);
+        execution_lat.end();
+        return ret;
       } else {
+        sync_message_lat.start();
         ITable *table = this->db.find_table(table_id, partition_id);
         auto coordinatorID =
             this->partitioner->master_coordinator(partition_id);
@@ -67,6 +71,7 @@ public:
             *(this->sync_messages[coordinatorID]), *table, key, key_offset);
         txn.distributed_transaction = true;
         txn.pendingResponses++;
+        sync_message_lat.end();
         return 0;
       }
     };

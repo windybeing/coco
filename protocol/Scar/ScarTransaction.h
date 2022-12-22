@@ -46,7 +46,14 @@ public:
   virtual TransactionResult execute(std::size_t worker_id) = 0;
 
   virtual void reset_query() = 0;
+  
+  int64_t get_execution_lat() { return 0; }
 
+  int64_t get_process_request_lat() { return 0; }
+
+  int64_t get_sync_message_lat() { return 0; }
+  void clear_lat() {}
+  
   template <class KeyType, class ValueType>
   void search_local_index(std::size_t table_id, std::size_t partition_id,
                           const KeyType &key, ValueType &value) {
@@ -186,6 +193,7 @@ public:
   Partitioner &partitioner;
   Operation operation;
   std::vector<ScarRWKey> readSet, writeSet;
+  Percentile<int64_t> execution_lat, process_request_lat, sync_message_lat;
 };
 
 } // namespace coco
