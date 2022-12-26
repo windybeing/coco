@@ -74,7 +74,7 @@ public:
     Percentile<int64_t> process_request_lat;
     Percentile<int64_t> prepare_remote_lat;
     Percentile<int64_t> sync_message_lat;
-    Percentile<int64_t> process_request2_lat, first_lat, second_lat, third_lat;
+    Percentile<int64_t> process_request_execution_lat, first_lat, second_lat, third_lat;
     for (;;) {
 
       ExecutorStatus status;
@@ -166,7 +166,7 @@ public:
               execution_lat.add(execution_latency - transaction->get_process_request_lat() - transaction->get_sync_message_lat() + init_latency);
               sync_message_lat.add(transaction->get_sync_message_lat());
               if (transaction->get_process_request_lat() != 0) {
-                process_request2_lat.add(transaction->get_process_request_lat());
+                process_request_execution_lat.add(transaction->get_process_request_lat());
               }
               prepare_lat.add(transaction->localPrepareTime);
               commit_lat.add(transaction->commitTime);
@@ -191,7 +191,7 @@ public:
               abort_execution_lat.add(execution_latency - transaction->get_process_request_lat() - transaction->get_sync_message_lat() + init_latency);
               sync_message_lat.add(transaction->get_sync_message_lat());
               if (transaction->get_process_request_lat() != 0) {
-                process_request2_lat.add(transaction->get_process_request_lat());
+                process_request_execution_lat.add(transaction->get_process_request_lat());
               }
               abort_prepare_lat.add(transaction->localPrepareTime);
               prepare_remote_lat.add(transaction->remotePrepareTime);
@@ -237,10 +237,12 @@ public:
               << " us (sum). " << process_request_lat.size();
         LOG(INFO) << "sync_message latency: " << sync_message_lat.aver() << " us (aver) " << sync_message_lat.sum()
               << " us (sum). " << sync_message_lat.size();
-        LOG(INFO) << "process_request2 latency: " << process_request2_lat.aver() << " us (aver) " << process_request2_lat.sum()
-              << " us (sum). " << process_request2_lat.size();
+        LOG(INFO) << "process_request_in_execution latency: " << process_request_execution_lat.aver() << " us (aver) " << process_request_execution_lat.sum()
+              << " us (sum). " << process_request_execution_lat.size();
         LOG(INFO) << "prepare_remote latency: " << prepare_remote_lat.aver() << " us (aver) " << prepare_remote_lat.sum()
               << " us (sum). " << prepare_remote_lat.size();
+        LOG(INFO) << "handle_msg latency: " << handle_msg_lat.aver() << " us (aver) " << handle_msg_lat.sum()
+              << " us (sum). " << handle_msg_lat.size();
 
           time = std::chrono::steady_clock::now();
           execution_lat.clear();
@@ -251,8 +253,9 @@ public:
           sleep_on_retry_lat.clear();
           process_request_lat.clear();
           sync_message_lat.clear();
-          process_request2_lat.clear();
+          process_request_execution_lat.clear();
           prepare_remote_lat.clear();
+          handle_msg_lat.clear();
         }
       } while (status != ExecutorStatus::STOP);
 
@@ -365,10 +368,11 @@ public:
         DCHECK(type < messageHandlers.size());
         ITable *table = db.find_table(messagePiece.get_table_id(),
                                       messagePiece.get_partition_id());
-
+        handle_msg_lat.start();
         messageHandlers[type](messagePiece,
                               *sync_messages[message->get_source_node_id()],
                               *table, transaction.get());
+        handle_msg_lat.end();
         message_stats[type]++;
         message_sizes[type] += messagePiece.get_message_length();
       }
@@ -422,7 +426,7 @@ protected:
   std::unique_ptr<Delay> delay;
   Percentile<int64_t> commit_latency, write_latency, while_latency;
   Percentile<int64_t> dist_latency, local_latency;
-  Percentile<int64_t> execution_lat, prepare_lat, commit_lat, abort_lat, sleep_on_retry_lat;
+  Percentile<int64_t> execution_lat, prepare_lat, commit_lat, abort_lat, sleep_on_retry_lat, handle_msg_lat;
   Percentile<int64_t> abort_execution_lat, abort_prepare_lat;
   std::unique_ptr<TransactionType> transaction;
   std::vector<std::unique_ptr<Message>> sync_messages, async_messages;
