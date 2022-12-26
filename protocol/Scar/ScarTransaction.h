@@ -171,9 +171,9 @@ public:
 public:
   std::size_t coordinator_id, partition_id;
   std::chrono::steady_clock::time_point startTime;
-  std::chrono::steady_clock::time_point prepareStartTime;
-  std::chrono::steady_clock::time_point commitStartTime;
-  std::chrono::steady_clock::time_point commitEndTime;
+  int64_t localPrepareTime;
+  int64_t commitTime;
+  int64_t remotePrepareTime;
   std::size_t pendingResponses;
   std::size_t network_size;
   uint64_t commit_rts, commit_wts;

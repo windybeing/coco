@@ -72,8 +72,9 @@ public:
     std::size_t count = 0;
     auto time = std::chrono::steady_clock::now();
     Percentile<int64_t> process_request_lat;
+    Percentile<int64_t> prepare_remote_lat;
     Percentile<int64_t> sync_message_lat;
-    Percentile<int64_t> process_request2_lat, first_lat, second_lat, third_lat, total_execution_lat;
+    Percentile<int64_t> process_request2_lat, first_lat, second_lat, third_lat;
     for (;;) {
 
       ExecutorStatus status;
@@ -167,8 +168,9 @@ public:
               if (transaction->get_process_request_lat() != 0) {
                 process_request2_lat.add(transaction->get_process_request_lat());
               }
-              prepare_lat.add(std::chrono::duration_cast<std::chrono::nanoseconds>(transaction->commitStartTime - transaction->prepareStartTime).count());
-              commit_lat.add(std::chrono::duration_cast<std::chrono::nanoseconds>(transaction->commitEndTime - transaction->commitStartTime).count());
+              prepare_lat.add(transaction->localPrepareTime);
+              commit_lat.add(transaction->commitTime);
+              prepare_remote_lat.add(transaction->remotePrepareTime);
               retry_transaction = false;
               q.push(std::move(transaction));
             } else {
@@ -191,7 +193,8 @@ public:
               if (transaction->get_process_request_lat() != 0) {
                 process_request2_lat.add(transaction->get_process_request_lat());
               }
-              abort_prepare_lat.add(std::chrono::duration_cast<std::chrono::nanoseconds>(transaction->commitStartTime - transaction->prepareStartTime).count());
+              abort_prepare_lat.add(transaction->localPrepareTime);
+              prepare_remote_lat.add(transaction->remotePrepareTime);
               random.set_seed(last_seed);
               retry_transaction = true;
             }
@@ -236,8 +239,8 @@ public:
               << " us (sum). " << sync_message_lat.size();
         LOG(INFO) << "process_request2 latency: " << process_request2_lat.aver() << " us (aver) " << process_request2_lat.sum()
               << " us (sum). " << process_request2_lat.size();
-        LOG(INFO) << "total_execution latency: " << total_execution_lat.aver() << " us (aver) " << total_execution_lat.sum()
-              << " us (sum). " << total_execution_lat.size();
+        LOG(INFO) << "prepare_remote latency: " << prepare_remote_lat.aver() << " us (aver) " << prepare_remote_lat.sum()
+              << " us (sum). " << prepare_remote_lat.size();
 
           time = std::chrono::steady_clock::now();
           execution_lat.clear();
@@ -249,7 +252,7 @@ public:
           process_request_lat.clear();
           sync_message_lat.clear();
           process_request2_lat.clear();
-          total_execution_lat.clear();
+          prepare_remote_lat.clear();
         }
       } while (status != ExecutorStatus::STOP);
 

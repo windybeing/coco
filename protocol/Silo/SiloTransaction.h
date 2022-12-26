@@ -41,6 +41,9 @@ public:
     operation.clear();
     readSet.clear();
     writeSet.clear();
+    localPrepareTime = 0;
+    remotePrepareTime = 0;
+    commitTime = 0;
   }
 
   virtual TransactionResult execute(std::size_t worker_id) = 0;
@@ -183,9 +186,9 @@ public:
 public:
   std::size_t coordinator_id, partition_id;
   std::chrono::steady_clock::time_point startTime;
-  std::chrono::steady_clock::time_point prepareStartTime;
-  std::chrono::steady_clock::time_point commitStartTime;
-  std::chrono::steady_clock::time_point commitEndTime;
+  int64_t localPrepareTime;
+  int64_t commitTime;
+  int64_t remotePrepareTime;
   std::size_t pendingResponses;
   std::size_t network_size;
   bool abort_lock, abort_read_validation, local_validated, si_in_serializable;

@@ -73,21 +73,18 @@ public:
   bool commit(TransactionType &txn,
               std::vector<std::unique_ptr<Message>> &syncMessages,
               std::vector<std::unique_ptr<Message>> &asyncMessages) {
-    txn.prepareStartTime = std::chrono::steady_clock::now();
     // lock write set
     if (lock_write_set(txn, syncMessages)) {
       abort(txn, syncMessages, asyncMessages);
-      txn.commitStartTime = std::chrono::steady_clock::now(); 
       return false;
     }
 
     // commit phase 2, read validation
     if (!validate_read_set(txn, syncMessages)) {
       abort(txn, syncMessages, asyncMessages);
-      txn.commitStartTime = std::chrono::steady_clock::now(); 
       return false;
     }
-    txn.commitStartTime = std::chrono::steady_clock::now(); 
+    auto commitStartTime = std::chrono::steady_clock::now(); 
 
     // generate tid
     uint64_t commit_tid = generate_tid(txn);
@@ -95,14 +92,15 @@ public:
     // write and replicate
     write_and_replicate(txn, commit_tid, syncMessages, asyncMessages);
 
-    txn.commitEndTime = std::chrono::steady_clock::now();
+    txn.commitTime = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now() - commitStartTime).count();
     return true;
   }
 
 private:
   bool lock_write_set(TransactionType &txn,
                       std::vector<std::unique_ptr<Message>> &messages) {
-
+    auto startTime = std::chrono::steady_clock::now();
     auto &readSet = txn.readSet;
     auto &writeSet = txn.writeSet;
 
@@ -157,13 +155,19 @@ private:
       // LOG(INFO) << "send empty msg";
     }
 #endif
+    auto localEndTime = std::chrono::steady_clock::now();
+    txn.localPrepareTime += std::chrono::duration_cast<std::chrono::nanoseconds>(
+            localEndTime - startTime).count();
     sync_messages(txn);
+    txn.remotePrepareTime += std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now() - localEndTime).count();
 
     return txn.abort_lock;
   }
 
   bool validate_read_set(TransactionType &txn,
                          std::vector<std::unique_ptr<Message>> &messages) {
+    auto startTime = std::chrono::steady_clock::now();
 
     auto &readSet = txn.readSet;
     auto &writeSet = txn.writeSet;
@@ -218,7 +222,12 @@ private:
       txn.local_validated = true;
     }
 
+    auto localEndTime = std::chrono::steady_clock::now();
+    txn.localPrepareTime += std::chrono::duration_cast<std::chrono::nanoseconds>(
+            localEndTime - startTime).count();
     sync_messages(txn);
+    txn.remotePrepareTime += std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now() - localEndTime).count();
 
     return !txn.abort_read_validation;
   }
