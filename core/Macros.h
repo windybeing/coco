@@ -48,19 +48,21 @@ DEFINE_bool(bohm_local, false, "locality optimization for Bohm.");
 DEFINE_bool(bohm_single_spin, false, "spin optimization for Bohm.");
 DEFINE_int32(ariaFB_lock_manager, 0,
              "# of lock manager in aria's fallback mode.");
+DEFINE_int32(distributed_ratio, 10, "ratio of distributed key");
 
 #define SETUP_CONTEXT(context)                                                 \
   boost::algorithm::split(context.peers, FLAGS_servers,                        \
                           boost::is_any_of(";"));                              \
   context.coordinator_num = context.peers.size();                              \
   context.coordinator_id = FLAGS_id;                                           \
+  context.distributed_ratio = FLAGS_distributed_ratio;                         \
   context.worker_num = FLAGS_threads;                                          \
   context.io_thread_num = FLAGS_io;                                            \
   context.partition_num = FLAGS_partition_num;                                 \
   context.partitioner = FLAGS_partitioner;                                     \
   context.sleep_on_retry = FLAGS_sleep_on_retry;                               \
   context.batch_size = FLAGS_batch_size;                                       \
-  context.group_time = FLAGS_group_time;                                       \
+  context.group_time = FLAGS_group_time;                                        \
   context.batch_flush = FLAGS_batch_flush;                                     \
   context.sleep_time = FLAGS_sleep_time;                                       \
   context.protocol = FLAGS_protocol;                                           \

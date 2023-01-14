@@ -41,6 +41,7 @@ public:
   std::string log_path;
   std::string cdf_path;
   std::size_t cpu_core_id = 0;
+  std::size_t distributed_ratio = 0;
 
   std::size_t durable_write_cost = 0;
 

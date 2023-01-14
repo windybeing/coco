@@ -18,6 +18,12 @@ int main(int argc, char *argv[]) {
 
   coco::tpcc::Context context;
   SETUP_CONTEXT(context);
+  
+#ifdef COCO_REMOTE
+  LOG(INFO) << "Running CoCo-remote";
+#else
+  LOG(INFO) << "Running CoCo-local";
+#endif
 
   context.operation_replication = FLAGS_operation_replication;
 

@@ -174,7 +174,7 @@ public:
 
     // gather throughput
     double sum_commit = gather(1.0 * total_commit / count);
-    if (id == 2) {
+    if (id == 0) {
       LOG(INFO) << "total commit: " << sum_commit;
     }
 
@@ -301,7 +301,7 @@ public:
 
     double sum = value;
 
-    if (id == 2) {
+    if (id == 0) {
       for (std::size_t i = 0; i < coordinator_num - 1; i++) {
 
         in_queue.wait_till_non_empty();
@@ -325,7 +325,7 @@ public:
 
     } else {
       auto message = std::make_unique<Message>();
-      init_message(message.get(), id, 2);
+      init_message(message.get(), id, 0);
       ControlMessageFactory::new_statistics_message(*message, value);
       out_queue.push(message.release());
     }

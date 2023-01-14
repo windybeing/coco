@@ -22,6 +22,12 @@ int main(int argc, char *argv[]) {
   coco::ycsb::Context context;
   SETUP_CONTEXT(context);
 
+#ifdef COCO_REMOTE
+  LOG(INFO) << "Running CoCo-remote";
+#else
+  LOG(INFO) << "Running CoCo-local";
+#endif
+
   if (FLAGS_skew_pattern == "both") {
     context.skewPattern = coco::ycsb::YCSBSkewPattern::BOTH;
   } else if (FLAGS_skew_pattern == "read") {
@@ -45,7 +51,12 @@ int main(int argc, char *argv[]) {
     if (context.global_key_space) {
       coco::Zipf::globalZipf().init(
           context.keysPerPartition * context.partition_num, FLAGS_zipf);
+#ifdef ENABLE_DISTRIBUTED_TXN
+      LOG(INFO) << "Using distributed key, distributed ratio: " << context.distributed_ratio;
+      Zipf2::zipfianGenerator = new Zipf2::ZipfianGenerator(0, context.keysPerPartition * context.worker_num - 1, FLAGS_zipf);
+#else
       Zipf2::zipfianGenerator = new Zipf2::ZipfianGenerator(0, context.keysPerPartition * context.partition_num - 1, FLAGS_zipf);
+#endif 
     } else {
       coco::Zipf::globalZipf().init(context.keysPerPartition, FLAGS_zipf);
       Zipf2::zipfianGenerator = new Zipf2::ZipfianGenerator(0, context.keysPerPartition - 1, FLAGS_zipf);

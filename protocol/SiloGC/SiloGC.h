@@ -145,9 +145,9 @@ private:
     auto coordinatorID = partitioner.neighbor_coordinator();
     auto message_cnt = (*messages[coordinatorID]).get_message_count();
     if (message_cnt == 0) {
-      auto &writeKey = writeSet[0];
-      auto tableId = writeKey.get_table_id();
-      auto partitionId = writeKey.get_partition_id();
+      auto &readKey = readSet[0];
+      auto tableId = readKey.get_table_id();
+      auto partitionId = readKey.get_partition_id();
       auto table = db.find_table(tableId, partitionId);
       txn.network_size += MessageFactoryType::new_empty_message(
             *messages[coordinatorID], *table);

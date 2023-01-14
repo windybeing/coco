@@ -21,13 +21,9 @@ for server in $server_array; do
     rsync -aqzP --port=22 --force ./bench_tpcc $server:/home/ubuntu/coco/
 done
 
-id=0
+id=1
 for addr in $server_array; do
     ssh $addr "cd coco; tmux new-session -d -s coco \"./tpcc.sh $id\"" &
     ((id+=1));
-    if [ $id == 2 ]
-    then
-        ((id+=1));
-    fi
 done
-./tpcc.sh 2
+./tpcc.sh 0

@@ -168,7 +168,22 @@ private:
                                                       context.partition_num) -
                                          1);
         } else {
+#ifdef ENABLE_DISTRIBUTED_TXN
+          auto distributed = random.uniform_dist(1, 100) <= context.distributed_ratio;
+          uint64_t node;
+          if (distributed && i == 0) {
+            node = random.uniform_dist(0, static_cast<int>(context.coordinator_num - 2));
+            if (node >= context.coordinator_id) {
+              ++node;
+            }
+          } else {
+            node = context.coordinator_id;
+          }
           key = Zipf2::zipfianGenerator->nextValue();
+          key = node + context.coordinator_num * key;
+#else
+          key = Zipf2::zipfianGenerator->nextValue();
+#endif
         }
         query.Y_KEY[i] = key;
 
