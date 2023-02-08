@@ -225,23 +225,14 @@ public:
               << " us (sum). " << execution_lat.size();
         LOG(INFO) << "prepare latency: " << prepare_lat.aver() << " us (aver) " << prepare_lat.sum()
               << " us (sum). " << prepare_lat.size();
-        LOG(INFO) << "abort_execution latency: " << abort_execution_lat.aver() << " us (aver) " << abort_execution_lat.sum()
-              << " us (sum). " << abort_execution_lat.size();
-        LOG(INFO) << "abort_prepare latency: " << abort_prepare_lat.aver() << " us (aver) " << abort_prepare_lat.sum()
-              << " us (sum). " << abort_prepare_lat.size();
+        LOG(INFO) << "abort latency: " << abort_prepare_lat.sum() + abort_execution_lat.sum()<< " us (sum). ";
         LOG(INFO) << "commit latency: " << commit_lat.aver() << " us (aver) " << commit_lat.sum()
               << " us (sum). " << commit_lat.size();
         LOG(INFO) << "sleep_on_retry latency: " << sleep_on_retry_lat.aver() << " us (aver) " << sleep_on_retry_lat.sum()
               << " us (sum). " << sleep_on_retry_lat.size();
-        LOG(INFO) << "process_request latency: " << process_request_lat.aver() << " us (aver) " << process_request_lat.sum()
-              << " us (sum). " << process_request_lat.size();
-        LOG(INFO) << "sync_message latency: " << sync_message_lat.aver() << " us (aver) " << sync_message_lat.sum()
-              << " us (sum). " << sync_message_lat.size();
-        LOG(INFO) << "process_request_in_execution latency: " << process_request_execution_lat.aver() << " us (aver) " << process_request_execution_lat.sum()
-              << " us (sum). " << process_request_execution_lat.size();
-        LOG(INFO) << "prepare_remote latency: " << prepare_remote_lat.aver() << " us (aver) " << prepare_remote_lat.sum()
-              << " us (sum). " << prepare_remote_lat.size();
-        LOG(INFO) << "handle_msg latency: " << handle_msg_lat.aver() << " us (aver) " << handle_msg_lat.sum()
+        LOG(INFO) << "idle latency: " << process_request_execution_lat.sum() + process_request_lat.sum() + prepare_remote_lat.sum()
+              << " us (sum). ";
+        LOG(INFO) << "handle_remote_msg latency: " << handle_msg_lat.aver() << " us (aver) " << handle_msg_lat.sum()
               << " us (sum). " << handle_msg_lat.size();
 
           time = std::chrono::steady_clock::now();

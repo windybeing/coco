@@ -26,7 +26,7 @@ cross_ratio=10
 global_key_space=true
 two_partitions=false
 distributed_ratio=xxx
-((keys=12 * 1024 * 272 * 64 / $partition_num))  #12 * 1024 * 272 * 64 / 125 = 1711276   2228224
+((keys=214732800 / $partition_num))  #12 * 1024 * 272 * 64 / 125 = 1711276   2228224
 echo $keys
 zipf=xxx
 

@@ -1,4 +1,5 @@
 contention=(1 5 10 15 20 25)
+cat /dev/null > result.txt
 
 for contention_ratio in ${contention[@]};
 do

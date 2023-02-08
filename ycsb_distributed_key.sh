@@ -1,6 +1,6 @@
-theta=(0.1 0.9 0.99)
-# dis_ratio=(0 1 2 3 4 5 10 15 20 30 40 50 60 70 80 90 100)
-dis_ratio=(0 2)
+theta=(0.1 0.99)
+dis_ratio=(0 10 20 30 40 50 60 70 80 90 100)
+# dis_ratio=(0 2)
 # theta=(0.9)
 cat /dev/null > result.txt
 for ratio in ${dis_ratio[@]};

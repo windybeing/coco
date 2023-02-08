@@ -217,7 +217,20 @@ private:
             readKey.get_tid());
       }
     }
-
+#ifdef COCO_REMOTE
+    auto coordinatorID = partitioner.neighbor_coordinator();
+    auto message_cnt = (*messages[coordinatorID]).get_message_count();
+    if (message_cnt == 0) {
+      auto &readKey = readSet[0];
+      auto tableId = readKey.get_table_id();
+      auto partitionId = readKey.get_partition_id();
+      auto table = db.find_table(tableId, partitionId);
+      txn.network_size += MessageFactoryType::new_empty_message(
+            *messages[coordinatorID], *table);
+      txn.pendingResponses++;
+      // LOG(INFO) << "send empty msg";
+    }
+#endif
     if (txn.pendingResponses == 0) {
       txn.local_validated = true;
     }
